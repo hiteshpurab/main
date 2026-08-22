@@ -1,0 +1,48 @@
+name: Windows Keystroke Remote Automation
+on: 
+  workflow_dispatch: # Allows you to trigger this manually from the Actions tab
+
+jobs:
+  automation:
+    runs-on: windows-latest
+    timeout-minutes: 360 # Max 6 hours
+    strategy:
+      fail-fast: false
+      matrix:
+        instance: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - name: Set Screen Resolution to 1920x1080
+        run: |
+          try {
+            Set-DisplayResolution -Width 1920 -Height 1080 -Force
+            Write-Host "✅ Resolution set to 1920x1080"
+          } catch {
+            Write-Host "⚠️ Set-DisplayResolution failed, trying registry method..."
+            New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Video\*\0000" -Name "DefaultSettings.XResolution" -Value 1920 -PropertyType DWord -Force -ErrorAction SilentlyContinue
+            New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Video\*\0000" -Name "DefaultSettings.YResolution" -Value 1080 -PropertyType DWord -Force -ErrorAction SilentlyContinue
+            Write-Host "Registry updated"
+          }
+
+      - name: Idle wait (2 minutes)
+        run: |
+          Write-Host "[Instance ${{ matrix.instance }}] Letting the environment settle..."
+          Start-Sleep -Seconds 120
+
+      - name: Clone automation repo
+        run: |
+          git clone https://github.com/sbgenius200/win-rdp.git
+
+      - name: Install dependencies
+        working-directory: win-rdp
+        run: |
+          pip install pynput
+
+      - name: Run keystroke playback
+        working-directory: win-rdp
+        run: |
+          python.exe main.py play keystrokes.json
+
+      - name: Keep runner alive until timeout
+        run: |
+          Write-Host "[Instance ${{ matrix.instance }}] Playback done. Keeping runner alive until job timeout..."
+          while ($true) { Start-Sleep -Seconds 60 }
